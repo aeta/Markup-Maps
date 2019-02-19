@@ -16,14 +16,7 @@ class ViewController: UIViewController, MKMapViewDelegate {
         }
     }
     
-    fileprivate var crumbs: CrumbPath?
-    fileprivate var crumbRenderer: CrumbPathRenderer?
-    
-    fileprivate var tempTouchesStorage = [CLLocationCoordinate2D]() {
-        didSet {
-            print(tempTouchesStorage.count)
-        }
-    }
+    fileprivate var crumbs: [Breadcrumb] = []
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -33,55 +26,64 @@ class ViewController: UIViewController, MKMapViewDelegate {
         self.mapView.isScrollEnabled = false
     }
     
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        defer { super.touchesBegan(touches, with: event) }
+        
+        guard let touch = touches.first else { return }
+        let point = touch.preciseLocation(in: self.mapView)
+        let coordinate = mapView.convert(point, toCoordinateFrom: self.mapView)
+        
+        let newCrumbs = Breadcrumb(withCenterCoordinate: coordinate)
+        self.crumbs.append(newCrumbs)
+        self.mapView.addOverlay(newCrumbs, level: .aboveRoads)
+    }
+    
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        defer { super.touchesMoved(touches, with: event) }
+        
         guard let firstTouch = touches.first else { return }
         let point = firstTouch.preciseLocation(in: self.mapView)
         let coordinate = mapView.convert(point, toCoordinateFrom: self.mapView)
         
         self.insertIntoMap(coordinate: coordinate)
+    }
+    
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
         
-//        super.touchesMoved(touches, with: event)
+        guard let crumbs = self.crumbs.last else { return }
+        print("Number of points: \(crumbs.points.count) (allocated cap: \(crumbs.points.capacity))")
     }
     
     func insertIntoMap(coordinate: CLLocationCoordinate2D) {
-        if let crumbs = self.crumbs {
-            let results = crumbs.add(coordinate: coordinate)
+        guard let crumbs = self.crumbs.last else { return }
+        let results = crumbs.add(coordinate: coordinate)
+        
+        if results.boundingMapRectChanged {
+            self.mapView.addOverlay(crumbs, level: .aboveRoads)
             
-            if results.boundingMapRectChanged {
-                self.mapView.removeOverlays(self.mapView.overlays)
-                self.crumbRenderer = nil
-                self.mapView.addOverlay(crumbs, level: .aboveRoads)
-                
-                let rect = crumbs.boundingMapRect
-                let points: [MKMapPoint] = [
-                    MKMapPoint(x: rect.minX, y: rect.minY),
-                    MKMapPoint(x: rect.minX, y: rect.maxY),
-                    MKMapPoint(x: rect.maxX, y: rect.maxY),
-                    MKMapPoint(x: rect.maxX, y: rect.minY)
-                ]
-                
-                let boundingMapRectOverlay = MKPolygon(points: points, count: points.count)
-                self.mapView.addOverlay(boundingMapRectOverlay, level: .aboveRoads)
-            } else if !results.result.isNull {
-                let currentZoomScale: MKZoomScale = self.mapView.bounds.size.width / CGFloat(self.mapView.visibleMapRect.size.width)
-                let lineWidth = Double(MKRoadWidthAtZoomScale(currentZoomScale))
-                
-                let updateRect = results.result.insetBy(dx: -lineWidth, dy: -lineWidth)
-                self.crumbRenderer!.setNeedsDisplay(updateRect)
-            }
-        } else {
-            self.crumbs = CrumbPath(withCenterCoordinate: coordinate)
-            self.mapView.addOverlay(self.crumbs!, level: .aboveRoads)
+            let rect = crumbs.boundingMapRect
+            let points: [MKMapPoint] = [
+                MKMapPoint(x: rect.minX, y: rect.minY),
+                MKMapPoint(x: rect.minX, y: rect.maxY),
+                MKMapPoint(x: rect.maxX, y: rect.maxY),
+                MKMapPoint(x: rect.maxX, y: rect.minY)
+            ]
+            
+            let boundingMapRectOverlay = MKPolygon(points: points, count: points.count)
+            self.mapView.addOverlay(boundingMapRectOverlay, level: .aboveRoads)
+        } else if !results.result.isNull {
+            let currentZoomScale: MKZoomScale = self.mapView.bounds.size.width / CGFloat(self.mapView.visibleMapRect.size.width)
+            let lineWidth = Double(MKRoadWidthAtZoomScale(currentZoomScale))
+            
+            let updateRect = results.result.insetBy(dx: -lineWidth, dy: -lineWidth)
+            crumbs.renderer.setNeedsDisplay(updateRect)
         }
     }
     
     func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-        if overlay is CrumbPath {
-            if self.crumbRenderer == nil {
-                self.crumbRenderer = CrumbPathRenderer(overlay: overlay)
-            }
-            
-            return self.crumbRenderer!
+        if let breadcrumb = overlay as? Breadcrumb {
+            return breadcrumb.renderer
         } else {
             return MKOverlayRenderer()
         }

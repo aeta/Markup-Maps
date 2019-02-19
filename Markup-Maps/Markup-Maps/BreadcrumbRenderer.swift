@@ -8,10 +8,10 @@
 
 import MapKit
 
-class CrumbPathRenderer: MKOverlayRenderer {
-    override func draw(_ mapRect: MKMapRect, zoomScale: MKZoomScale, in context: CGContext) {
-        guard let crumbs = self.overlay as? CrumbPath else {
-            precondition(false, "Expected overlay type to be CrumbPath.")
+public class BreadcrumbRenderer: MKOverlayRenderer {
+    override public func draw(_ mapRect: MKMapRect, zoomScale: MKZoomScale, in context: CGContext) {
+        guard let crumbs = self.overlay as? Breadcrumb else {
+            precondition(false, "Expected overlay type to be Breadcrumb.")
         }
         
         let lineWidth = MKRoadWidthAtZoomScale(zoomScale)

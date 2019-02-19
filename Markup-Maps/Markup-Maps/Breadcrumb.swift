@@ -12,27 +12,23 @@
 import MapKit
 import Foundation
 
-class CrumbPath: NSObject, MKOverlay {
-    typealias AddCoordinateCompletion = (result: MKMapRect, boundingMapRectChanged: Bool)
-//    typealias BoundingMapRectChanged = Bool
+public class Breadcrumb: NSObject, MKOverlay {
+    public typealias AddCoordinateCompletion = (result: MKMapRect, boundingMapRectChanged: Bool)
     
-    var minimumDeltaInMeters: CLLocationDistance = 10
+    public var minimumDeltaInMeters: CLLocationDistance = 5
     
-    var boundingMapRect: MKMapRect
-    var coordinate: CLLocationCoordinate2D {
+    public var boundingMapRect: MKMapRect
+    public var coordinate: CLLocationCoordinate2D {
         return queue.sync { () -> CLLocationCoordinate2D in
             return points.first!.coordinate
         }
     }
     
-    var points: [MKMapPoint]
-//    fileprivate var dispatch = DispatchGroup()
+    public var points: [MKMapPoint] = []
+    public lazy var renderer: BreadcrumbRenderer = BreadcrumbRenderer(overlay: self)
     fileprivate var queue = DispatchQueue(label: "markupmaps.crumbpath.queue")
     
-    init(withCenterCoordinate centerCoordinate: CLLocationCoordinate2D) {
-        points = [MKMapPoint]()
-        points.reserveCapacity(1000)
-        
+    public init(withCenterCoordinate centerCoordinate: CLLocationCoordinate2D) {
         let origin = MKMapPoint(centerCoordinate)
         self.points.append(origin)
         
@@ -77,7 +73,7 @@ class CrumbPath: NSObject, MKOverlay {
         return newPointRect.union(previousPointRect)
     }
     
-    func add(coordinate newCoordinate: CLLocationCoordinate2D) -> AddCoordinateCompletion {
+    public func add(coordinate newCoordinate: CLLocationCoordinate2D) -> AddCoordinateCompletion {
         return queue.sync { () -> AddCoordinateCompletion in
             var boundingMapRectChanged = false
             var updateRect = MKMapRect.null
